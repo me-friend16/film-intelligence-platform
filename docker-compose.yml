@@ -1,0 +1,85 @@
+version: "3.9"
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: fip_nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - fip_net
+
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fip_app
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      APP_ENV: local
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: "1"
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - fip_net
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fip_worker
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - app
+      - redis
+      - mysql
+    command: php artisan queue:work --sleep=1 --tries=3 --timeout=300
+    networks:
+      - fip_net
+
+  mysql:
+    image: mysql:8.0
+    container_name: fip_mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_DATABASE: filmintelligence
+      MYSQL_USER: fip_user
+      MYSQL_PASSWORD: fip_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    volumes:
+      - fip_mysql_data:/var/lib/mysql
+    networks:
+      - fip_net
+
+  redis:
+    image: redis:alpine
+    container_name: fip_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - fip_net
+
+  ai-engine:
+    build:
+      context: ./ai-engine
+      dockerfile: Dockerfile
+    container_name: fip_ai_engine
+    ports:
+      - "8000:8000"
+    networks:
+      - fip_net
+
+networks:
+  fip_net:
+
+volumes:
+  fip_mysql_data:
