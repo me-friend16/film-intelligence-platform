@@ -6,11 +6,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -21,6 +22,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role_id',
     ];
 
     /**
@@ -47,19 +49,44 @@ class User extends Authenticatable
     }
 
     public function role()
-{
-    return $this->belongsTo(Role::class);
-}
+    {
+        return $this->belongsTo(\App\Models\Role::class);
+    }
 
-public function hasRole(string $slug): bool
-{
-    return $this->role && $this->role->slug === $slug;
-}
+    public function hasRole(string $slug): bool
+    {
+        return $this->role && $this->role->slug === $slug;
+    }
 
-public function hasPermission(string $permissionSlug): bool
-{
-    return $this->role && $this->role->permissions()
-        ->where('slug', $permissionSlug)
-        ->exists();
-}
+    public function hasPermission(string $permissionSlug): bool
+    {
+        return $this->role && $this->role->permissions()
+            ->where('slug', $permissionSlug)
+            ->exists();
+    }
+    public function subscription()
+    {
+        return $this->hasOne(\App\Models\Subscription::class);
+    }
+
+    public function hasActiveSubscription(): bool
+    {
+        return $this->subscription && $this->subscription->isActive();
+    }
+
+    public function plan()
+    {
+        return $this->subscription?->plan;
+    }
+
+    public function hasFeature(string $featureSlug): bool
+    {
+        $plan = $this->plan();
+        return $plan ? $plan->hasFeature($featureSlug) : false;
+    }
+
+    public function scripts()
+    {
+        return $this->hasMany(\App\Models\Script::class);
+    }
 }
